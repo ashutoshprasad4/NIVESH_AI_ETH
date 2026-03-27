@@ -23,15 +23,6 @@ export const Chart: React.FC<ChartProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current || data.length === 0) return;
 
-    const seen = new Set<string | number>();
-    const cleanData = data
-      .filter(d => {
-        if (seen.has(d.time)) return false;
-        seen.add(d.time);
-        return true;
-      })
-      .sort((a, b) => (a.time > b.time ? 1 : a.time < b.time ? -1 : 0));
-
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: backgroundColor },
@@ -57,7 +48,24 @@ export const Chart: React.FC<ChartProps> = ({
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       });
-      series.setData(cleanData as any);
+      series.setData(data as any);
+    } else if (chartType === 'area') {
+      const series = chart.addSeries(AreaSeries, {
+        lineColor: '#3b82f6',
+        topColor: 'rgba(59,130,246,0.4)',
+        bottomColor: 'rgba(59,130,246,0.02)',
+        lineWidth: 2,
+        crosshairMarkerVisible: true,
+        lastValueVisible: true,
+        priceLineVisible: true,
+      });
+      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
+    } else if (chartType === 'bar') {
+      const series = chart.addSeries(HistogramSeries, {
+        color: '#6366f1',
+        priceFormat: { type: 'price' },
+      });
+      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
     } else {
       const series = chart.addSeries(LineSeries, {
         color: '#3b82f6',
@@ -66,8 +74,7 @@ export const Chart: React.FC<ChartProps> = ({
         lastValueVisible: true,
         priceLineVisible: true,
       });
-      // Line chart only needs time + value
-      series.setData(cleanData.map(d => ({ time: d.time, value: d.close })) as any);
+      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
     }
 
     chart.timeScale().fitContent();
