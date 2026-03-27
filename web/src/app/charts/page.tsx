@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Chart } from '@/components/Chart';
 import SignalCard from '@/components/SignalCard';
-import { Search, RefreshCw, Bot, BarChart2, TrendingUp, TrendingDown, Minus, Send, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, Bot, BarChart2, TrendingUp, TrendingDown, Minus, Send, Trash2, Sparkles } from 'lucide-react';
 import { searchStocks } from '@/lib/nse-stocks';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; pattern?: string };
@@ -97,8 +97,8 @@ export default function ChartsPage() {
         setChartData(hist);
         localStorage.setItem(cacheKey, JSON.stringify({ data: hist, timestamp: Date.now() }));
       }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') console.error("Chart load failed", e);
+    } catch (e) {
+      if (e instanceof Error && e.name !== 'AbortError') console.error("Chart load failed", e);
     } finally {
       setLoadingChart(false);
     }
@@ -129,8 +129,8 @@ export default function ChartsPage() {
         setPatternData(data);
         localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
       }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') console.error("Patterns load failed", e);
+    } catch (e) {
+      if (e instanceof Error && e.name !== 'AbortError') console.error("Patterns load failed", e);
     } finally {
       setLoadingPatterns(false);
     }
@@ -143,6 +143,20 @@ export default function ChartsPage() {
 
   // Main sync effect
   useEffect(() => {
+    // Save to recently viewed
+    const results = searchStocks(symbol.replace('.NS', '').replace('.BO', ''));
+    const name = results.find(r => r.symbol === symbol)?.name || symbol.replace('.NS', '');
+    const stock = { symbol, name };
+    const saved = localStorage.getItem('algo_recent_stocks');
+    let recents: any[] = [];
+    if (saved) {
+      try { recents = JSON.parse(saved); } catch (e) {}
+    }
+    recents = recents.filter((r: any) => r.symbol !== symbol);
+    recents.unshift(stock);
+    if (recents.length > 5) recents.pop();
+    localStorage.setItem('algo_recent_stocks', JSON.stringify(recents));
+
     const controller = new AbortController();
     loadChart(symbol, timeframe, controller.signal);
     loadPatterns(symbol, controller.signal);
@@ -224,7 +238,7 @@ export default function ChartsPage() {
   const generateAI = (pattern?: any) => {
     const p = pattern || patternData?.patterns?.[0];
     const msg = p
-      ? `Explain the ${p.name} pattern detected on ${symbol}.`
+      ? `NIVESHAI, I see an AI-detected **${p.name}** (${p.type}) pattern on **${symbol}** with **${p.confidence}% confidence**.${p.key_level ? ` The key level to watch is **₹${p.key_level}**.` : ''} Can you elaborate on the potential trade setup and risk factors for this scenario?`
       : `Give me an overview of ${symbol}'s current chart setup.`;
     sendMessage(msg, pattern);
   };
@@ -329,22 +343,29 @@ export default function ChartsPage() {
         {/* Pattern Detection Strip */}
         <div className="shrink-0 border-t border-gray-800 bg-[#12131C] p-4">
           <div className="flex items-center gap-2 mb-3">
-            <BarChart2 size={14} className="text-purple-400" />
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Detected Patterns</h3>
+            <Bot size={15} className="text-blue-400" />
+            <h3 className="text-xs font-bold text-blue-400/90 uppercase tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">Detected Patterns</h3>
             {loadingPatterns && <RefreshCw size={12} className="animate-spin text-gray-500 ml-1" />}
           </div>
           {!loadingPatterns && patternData?.patterns?.length > 0 ? (
             <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
               {patternData.patterns.map((p: any, i: number) => (
                 <button key={i} onClick={() => generateAI(p)}
-                  className={`flex-shrink-0 bg-gray-900 border rounded-xl px-4 py-3 text-left hover:border-blue-500 transition-all ${selectedPattern?.name === p.name ? 'border-blue-500 bg-blue-500/5' : 'border-gray-800'}`}>
-                  <div className="flex items-center gap-2 mb-1">
+                  className={`flex-shrink-0 group relative border rounded-xl px-4 py-3 text-left transition-all overflow-hidden ${selectedPattern?.name === p.name ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'bg-gray-900 border-gray-800 hover:border-blue-500/50 hover:bg-gray-800/80'}`}>
+                  {selectedPattern?.name === p.name && (
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/20 blur-xl rounded-full -mr-8 -mt-8 pointer-events-none" />
+                  )}
+                  <div className="flex items-center gap-2 mb-1 relative z-10">
                     <span className="text-sm font-semibold text-gray-100">{p.name}</span>
                     <PatternBadge type={p.type} />
                   </div>
-                  <div className="text-xs text-gray-500">Confidence: <span className="text-gray-300 font-bold">{p.confidence}%</span></div>
-                  {p.key_level && <div className="text-xs text-gray-500 mt-0.5">Key Level: <span className="text-yellow-400 font-mono">₹{p.key_level}</span></div>}
-                  <div className="text-[11px] text-blue-400 mt-1.5">Click → AI Explain</div>
+                  <div className="text-xs text-gray-500 relative z-10">Confidence: <span className="text-gray-300 font-bold">{p.confidence}%</span></div>
+                  {p.key_level && <div className="text-xs text-gray-500 mt-0.5 relative z-10">Key Level: <span className="text-yellow-400 font-mono">₹{p.key_level}</span></div>}
+
+                  <div className={`flex items-center gap-1.5 mt-2 text-[11px] font-bold transition-colors relative z-10 ${selectedPattern?.name === p.name ? 'text-blue-400' : 'text-gray-500 group-hover:text-blue-400'}`}>
+                    <Sparkles size={11} className={selectedPattern?.name === p.name ? 'animate-pulse' : ''} />
+                    Ask NIVESHAI
+                  </div>
                 </button>
               ))}
             </div>

@@ -4,19 +4,32 @@ import Link from 'next/link';
 import SignalCard from '@/components/SignalCard';
 import { TrendingUp, TrendingDown, ArrowRight, RefreshCw, Activity } from 'lucide-react';
 
-const TOP_STOCKS = ['HDFCBANK.NS', 'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'SBIN.NS', 'AXISBANK.NS'];
+import { NSE_STOCKS } from '@/lib/nse-stocks';
+
 const INDICES = ['^NSEI', '^BSESN'];
+const DEFAULT_TOP_STOCKS = ['HDFCBANK.NS', 'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'SBIN.NS', 'AXISBANK.NS'];
+let memoizedTopStocks: string[] | null = null;
 
 export default function Dashboard() {
   const [quotes, setQuotes] = useState<Record<string, any>>({});
   const [indices, setIndices] = useState<Record<string, any>>({});
   const [signals, setSignals] = useState<any[]>([]);
+  const [topStocks, setTopStocks] = useState<string[]>(DEFAULT_TOP_STOCKS);
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
 
   useEffect(() => {
     setTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
     const timer = setInterval(() => setTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })), 60000);
+    
+    // Pick 6 random stocks from top 100 on first mount or refresh
+    if (!memoizedTopStocks) {
+      const pool = NSE_STOCKS.slice(0, 100);
+      const shuffled = [...pool].sort(() => 0.5 - Math.random());
+      memoizedTopStocks = shuffled.slice(0, 6).map(s => s.symbol);
+    }
+    setTopStocks(memoizedTopStocks);
+
     return () => clearInterval(timer);
   }, []);
 
@@ -45,7 +58,7 @@ export default function Dashboard() {
 
       try {
         // Prepare batched symbols
-        const allSymbols = [...INDICES, ...TOP_STOCKS].join(',');
+        const allSymbols = [...INDICES, ...topStocks].join(',');
 
         // Fetch market data (batched) and radar (parallel)
         const [marketRes, radarRes] = await Promise.all([
@@ -60,7 +73,7 @@ export default function Dashboard() {
         const newIndices: Record<string, any> = {};
 
         // Parse batched market data
-        TOP_STOCKS.forEach(sym => {
+        topStocks.forEach(sym => {
           if (marketData[sym] && !marketData[sym].error) {
             newQuotes[sym] = marketData[sym];
           }
@@ -101,7 +114,7 @@ export default function Dashboard() {
       controller.abort();
       clearInterval(interval);
     };
-  }, []);
+  }, [topStocks]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0E0F14] p-6 space-y-8">
@@ -165,7 +178,7 @@ export default function Dashboard() {
           <div className="h-px flex-1 bg-gray-800 mx-4"></div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {TOP_STOCKS.map((sym) => {
+          {topStocks.map((sym) => {
             const d = quotes[sym];
             const pct = d?.changePercent ?? 0;
             const price = d?.currentPrice ?? 0;

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { searchStocks, NSE_STOCKS } from '@/lib/nse-stocks';
-import { Search, Star, StarOff, Trash2, TrendingUp, TrendingDown, Target, Bell, StickyNote, BarChart2, ExternalLink } from 'lucide-react';
+import { searchStocks } from '@/lib/nse-stocks';
+import { Search, Star, StarOff, Trash2, TrendingUp, TrendingDown, Target, Bell, StickyNote, BarChart2, ExternalLink, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 interface WatchlistStock {
@@ -23,10 +23,12 @@ export default function WatchlistPage() {
   const [watchlist, setWatchlist] = useState<WatchlistStock[]>([]);
   const [liveData, setLiveData] = useState<Record<string, LiveData>>({});
   const [searchInput, setSearchInput] = useState('');
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<{symbol: string, name: string}[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [editingStock, setEditingStock] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<WatchlistStock>>({});
+  const [recentStocks, setRecentStocks] = useState<Array<{symbol: string, name: string}>>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -35,16 +37,23 @@ export default function WatchlistPage() {
       try { setWatchlist(JSON.parse(saved)); } catch { }
     }
     // else: start with empty list — user adds their own stocks
+    const recents = localStorage.getItem('algo_recent_stocks');
+    if (recents) {
+      try { setRecentStocks(JSON.parse(recents)); } catch { }
+    }
+    setIsLoaded(true);
   }, []);
 
   // Save to localStorage whenever watchlist changes (including empty)
   useEffect(() => {
-    localStorage.setItem('algo_watchlist', JSON.stringify(watchlist));
-  }, [watchlist]);
+    if (isLoaded) {
+      localStorage.setItem('algo_watchlist', JSON.stringify(watchlist));
+    }
+  }, [watchlist, isLoaded]);
 
   // Fetch live prices with AbortController and race condition protection
   useEffect(() => {
-    if (watchlist.length === 0) {
+    if (watchlist.length === 0 && recentStocks.length === 0) {
       setLiveData({});
       return;
     }
@@ -55,7 +64,7 @@ export default function WatchlistPage() {
       const results: Record<string, LiveData> = {};
 
       // Use a local copy to avoid closure issues during the long fetch
-      const symbolsToFetch = watchlist.map(s => s.symbol);
+      const symbolsToFetch = Array.from(new Set([...watchlist.map(s => s.symbol), ...recentStocks.map(s => s.symbol)]));
 
       try {
         // Fetch in smaller batches or with a bit more care
@@ -65,16 +74,16 @@ export default function WatchlistPage() {
             const res = await fetch(`/api/market?symbol=${sym}&period=5d&interval=1d`, { signal: controller.signal });
             const data = await res.json();
             if (!data.error) results[sym] = { currentPrice: data.currentPrice, changePercent: data.changePercent };
-          } catch (e: any) {
-            if (e.name !== 'AbortError') console.error(`Watchlist fetch failed for ${sym}`, e);
+          } catch (e) {
+            if (e instanceof Error && e.name !== 'AbortError') console.error(`Watchlist fetch failed for ${sym}`, e);
           }
         }));
 
         if (!controller.signal.aborted) {
           setLiveData(prev => ({ ...prev, ...results }));
         }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') console.error("Watchlist fetchAll failed", e);
+      } catch (e) {
+        if (e instanceof Error && e.name !== 'AbortError') console.error("Watchlist fetchAll failed", e);
       }
     };
 
@@ -85,7 +94,8 @@ export default function WatchlistPage() {
       controller.abort();
       clearInterval(interval);
     };
-  }, [watchlist.map(s => s.symbol).join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlist.map(s => s.symbol).join(','), recentStocks.map(s => s.symbol).join(',')]);
 
   const addToWatchlist = (sym: string, name: string) => {
     if (watchlist.find(s => s.symbol === sym)) return;
@@ -96,6 +106,12 @@ export default function WatchlistPage() {
 
   const removeFromWatchlist = (sym: string) => {
     setWatchlist(prev => prev.filter(s => s.symbol !== sym));
+  };
+
+  const removeFromRecent = (sym: string) => {
+    const updated = recentStocks.filter(s => s.symbol !== sym);
+    setRecentStocks(updated);
+    localStorage.setItem('algo_recent_stocks', JSON.stringify(updated));
   };
 
   const saveEdit = (sym: string) => {
@@ -134,7 +150,8 @@ export default function WatchlistPage() {
       </div>
 
       {/* Search + Add */}
-      <div className="relative max-w-md">
+      <div className="flex flex-col gap-4">
+        <div className="relative max-w-md">
         <form onSubmit={e => {
           e.preventDefault();
           if (!searchInput.trim()) return;
@@ -175,17 +192,23 @@ export default function WatchlistPage() {
             ))}
           </div>
         )}
+        </div>
       </div>
 
-      {/* Watchlist Table */}
-      {watchlist.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <StarOff size={40} className="text-gray-700" />
-          <p className="text-gray-500">Your watchlist is empty. Search above to add stocks.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {watchlist.map((stock) => {
+      {/* Watchlist Section */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-gray-200 mb-3 flex items-center gap-2">
+            <Star className="text-yellow-500" size={18} /> Tracked Watchlist
+          </h2>
+          {watchlist.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-4 text-center border border-dashed border-gray-800 rounded-2xl bg-gray-900/30">
+              <StarOff size={30} className="text-gray-700" />
+              <p className="text-gray-500 text-sm">Your watchlist is empty. Search above to add stocks.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+              {watchlist.map((stock) => {
             const live = liveData[stock.symbol];
             const price = live?.currentPrice;
             const pct = live?.changePercent;
@@ -288,8 +311,73 @@ export default function WatchlistPage() {
               </div>
             );
           })}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Recently Viewed Section */}
+        {recentStocks.length > 0 && (
+          <div className="pt-6 border-t border-gray-800/80">
+            <h2 className="text-lg font-bold text-gray-400 mb-3 flex items-center gap-2">
+              <Clock className="text-gray-500" size={18} /> Recently Viewed
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-80 hover:opacity-100 transition-opacity">
+              {recentStocks.map((stock) => {
+                const live = liveData[stock.symbol];
+                const price = live?.currentPrice;
+                const pct = live?.changePercent;
+                const isUp = (pct ?? 0) >= 0;
+                const inWatchlist = watchlist.some(s => s.symbol === stock.symbol);
+
+                return (
+                  <div key={`recent-${stock.symbol}`} className="bg-gray-900/40 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <Link href={`/charts?symbol=${stock.symbol}`} className="font-bold text-gray-300 hover:text-blue-400 transition-colors flex items-center gap-1">
+                            {stock.symbol.replace('.NS', '')} <ExternalLink size={10} />
+                          </Link>
+                        </div>
+                        <div className="text-[10px] text-gray-600 truncate uppercase tracking-wider">{stock.name}</div>
+                      </div>
+                      <button onClick={() => removeFromRecent(stock.symbol)}
+                        className="p-1.5 rounded-lg text-gray-600 hover:bg-red-500/10 hover:text-red-400 transition-all shrink-0" title="Remove from recent">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-end justify-between mt-4">
+                      <div className="flex items-baseline gap-2">
+                        {price ? (
+                          <>
+                            <span className="font-mono text-lg font-bold text-gray-300">₹{Number(price).toFixed(2)}</span>
+                            <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${isUp ? 'text-green-500/80' : 'text-red-500/80'}`}>
+                              {isUp ? '+' : ''}{Number(pct).toFixed(2)}%
+                            </span>
+                          </>
+                        ) : (
+                          <div className="h-5 w-24 bg-gray-800/50 rounded animate-pulse" />
+                        )}
+                      </div>
+                      
+                      {!inWatchlist ? (
+                        <button onClick={() => addToWatchlist(stock.symbol, stock.name)}
+                          className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1">
+                          <span>+</span> Add
+                        </button>
+                      ) : (
+                        <span className="text-[10px] bg-gray-800/50 text-gray-500 border border-gray-800 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                          <Star size={10} /> Added
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
