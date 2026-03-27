@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries } from 'lightweight-charts';
 
 interface ChartProps {
   data: { time: string; open?: number; high?: number; low?: number; close: number }[];
-  chartType?: 'candlestick' | 'line';
+  chartType?: 'candlestick' | 'line' | 'bar' | 'area';
   colors?: {
     backgroundColor?: string;
     textColor?: string;
