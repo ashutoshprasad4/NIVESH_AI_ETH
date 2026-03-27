@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
-import { execSync } from 'child_process';
-import path from 'path';
+import { runPythonScript, getCachedData, setCachedData } from '@/lib/api-utils';
 
 export async function GET() {
+  const cacheKey = 'radar_data';
+  const cached = getCachedData(cacheKey);
+  if (cached) return NextResponse.json(cached);
+
   try {
-    const scriptPath = path.join(process.cwd(), 'scripts', 'fetch_radar.py');
-    const output = execSync(`python "${scriptPath}"`, { timeout: 60000 }).toString();
-    const data = JSON.parse(output);
-    if (data.error) throw new Error(data.error);
-    return NextResponse.json({ signals: data.signals || [], news: data.news || [] });
+    const data = await runPythonScript('fetch_radar.py');
+    const response = { signals: data.signals || [], news: data.news || [] };
+
+    // Cache for 5 minutes (300 seconds)
+    setCachedData(cacheKey, response, 300);
+
+    return NextResponse.json(response);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

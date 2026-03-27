@@ -9,9 +9,9 @@ const TYPE_COLORS: Record<string, 'green' | 'red' | 'yellow' | 'blue'> = {
 
 const badgeStyles: Record<string, string> = {
   green: 'bg-green-500/15 text-green-400 border-green-500/30',
-  red:   'bg-red-500/15 text-red-400 border-red-500/30',
-  yellow:'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  blue:  'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  red: 'bg-red-500/15 text-red-400 border-red-500/30',
+  yellow: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  blue: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
 };
 
 const sentimentStyle: Record<string, string> = {
@@ -35,7 +35,7 @@ function ExpandableSignalCard({ signal }: { signal: any }) {
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className="font-bold text-gray-100 text-[15px]">{signal.title}</span>
               {signal.type && (
-                <span className="text-[10px] bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded-full uppercase tracking-wider">{signal.type.replace('_',' ')}</span>
+                <span className="text-[10px] bg-gray-800 border border-gray-700 text-gray-400 px-2 py-0.5 rounded-full uppercase tracking-wider">{signal.type.replace('_', ' ')}</span>
               )}
             </div>
             <p className="text-xs text-gray-500 mb-2">{signal.symbol} {signal.price ? `· ₹${Number(signal.price).toFixed(2)}` : ''} {signal.pct_change ? `· ${signal.pct_change >= 0 ? '+' : ''}${Number(signal.pct_change).toFixed(2)}% today` : ''}</p>
@@ -43,7 +43,7 @@ function ExpandableSignalCard({ signal }: { signal: any }) {
           </div>
           <div className="flex flex-col items-end gap-3 shrink-0">
             <span className={`text-xs font-bold border px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${badgeStyles[color]}`}>
-              <Icon size={11}/>{signal.badge}
+              <Icon size={11} />{signal.badge}
             </span>
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-center gap-1">
@@ -52,11 +52,11 @@ function ExpandableSignalCard({ signal }: { signal: any }) {
               </div>
               <div className="w-24 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${(signal.confidence ?? 0) > 70 ? 'bg-green-500' : (signal.confidence ?? 0) > 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                  style={{ width: `${signal.confidence}%` }}/>
+                  style={{ width: `${signal.confidence}%` }} />
               </div>
             </div>
             <span className={`text-xs font-medium text-blue-400 flex items-center gap-1 mt-1`}>
-              {expanded ? <><ChevronUp size={12}/> Less</> : <><ChevronDown size={12}/> Explain</>}
+              {expanded ? <><ChevronUp size={12} /> Less</> : <><ChevronDown size={12} /> Explain</>}
             </span>
           </div>
         </div>
@@ -74,7 +74,7 @@ function ExpandableSignalCard({ signal }: { signal: any }) {
             {signal.detail.link && (
               <a href={signal.detail.link} target="_blank" rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 shrink-0">
-                <ExternalLink size={14}/>
+                <ExternalLink size={14} />
               </a>
             )}
           </div>
@@ -105,20 +105,48 @@ export default function RadarPage() {
   const [activeTab, setActiveTab] = useState<'signals' | 'news'>('signals');
   const [lastRefresh, setLastRefresh] = useState('');
 
-  const loadSignals = async () => {
-    setLoading(true); setError('');
+  const loadSignals = async (isInitial = false, signal?: AbortSignal) => {
+    if (isInitial) {
+      const cached = localStorage.getItem('niveshai_radar_cache');
+      if (cached) {
+        try {
+          const { signals: cS, news: cN, timestamp } = JSON.parse(cached);
+          const isFresh = Date.now() - timestamp < 600000; // 10 min TTL
+          setSignals(cS || []);
+          setNews(cN || []);
+          if (isFresh) {
+            setLoading(false);
+            return;
+          }
+        } catch (e) { console.error("Radar cache error", e); }
+      }
+    }
+
+    setLoading(isInitial); setError('');
     try {
-      const res = await fetch('/api/radar');
+      const res = await fetch('/api/radar', { signal });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setSignals(data.signals || []);
       setNews(data.news || []);
       setLastRefresh(new Date().toLocaleTimeString('en-IN'));
-    } catch (e: any) { setError(e.message); }
+
+      localStorage.setItem('niveshai_radar_cache', JSON.stringify({
+        signals: data.signals,
+        news: data.news,
+        timestamp: Date.now()
+      }));
+    } catch (e: any) {
+      if (e.name !== 'AbortError') setError(e.message);
+    }
     setLoading(false);
   };
 
-  useEffect(() => { loadSignals(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadSignals(true, controller.signal);
+    return () => controller.abort();
+  }, []);
 
   const filtered = filter === 'ALL' ? signals : signals.filter(s => s.type === filter);
 
@@ -128,7 +156,7 @@ export default function RadarPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600/20 p-2 rounded-xl border border-blue-500/30">
-            <RadarIcon size={22} className="text-blue-400"/>
+            <RadarIcon size={22} className="text-blue-400" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Opportunity Radar</h1>
@@ -137,8 +165,8 @@ export default function RadarPage() {
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && <span className="text-[11px] text-gray-500">Updated {lastRefresh}</span>}
-          <button onClick={loadSignals} className="flex items-center gap-2 bg-gray-900 border border-gray-800 hover:border-blue-500 px-4 py-2 rounded-xl text-sm text-gray-300 hover:text-white transition-all">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''}/> Refresh
+          <button onClick={() => loadSignals()} className="flex items-center gap-2 bg-gray-900 border border-gray-800 hover:border-blue-500 px-4 py-2 rounded-xl text-sm text-gray-300 hover:text-white transition-all">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
       </div>
@@ -152,17 +180,17 @@ export default function RadarPage() {
       <div className="flex gap-2 border-b border-gray-800 pb-0">
         <button onClick={() => setActiveTab('signals')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${activeTab === 'signals' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
-          <Zap size={15}/> Signals ({signals.length})
+          <Zap size={15} /> Signals ({signals.length})
         </button>
         <button onClick={() => setActiveTab('news')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${activeTab === 'news' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
-          <Newspaper size={15}/> Market News ({news.length})
+          <Newspaper size={15} /> Market News ({news.length})
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-48 text-gray-500 gap-3">
-          <RefreshCw className="animate-spin text-blue-500" size={22}/>
+          <RefreshCw className="animate-spin text-blue-500" size={22} />
           <span className="animate-pulse text-sm">Scanning NSE universe for signals…</span>
         </div>
       ) : error ? (
@@ -171,10 +199,10 @@ export default function RadarPage() {
         <>
           {/* Filter Chips */}
           <div className="flex gap-2 flex-wrap">
-            {['ALL','INSIDER_BUY','BULK_DEAL','FILING_CHANGE','PRICE_MOVE','NEWS_SIGNAL'].map(t => (
+            {['ALL', 'INSIDER_BUY', 'BULK_DEAL', 'FILING_CHANGE', 'PRICE_MOVE', 'NEWS_SIGNAL'].map(t => (
               <button key={t} onClick={() => setFilter(t)}
                 className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${filter === t ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-700'}`}>
-                {t.replace('_',' ')}
+                {t.replace('_', ' ')}
               </button>
             ))}
           </div>
@@ -182,7 +210,7 @@ export default function RadarPage() {
             {filtered.length === 0 ? (
               <div className="text-gray-500 text-sm p-8 bg-gray-900 border border-gray-800 rounded-xl text-center">No signals matched the selected filter.</div>
             ) : filtered.map((s, i) => (
-              <ExpandableSignalCard key={i} signal={s}/>
+              <ExpandableSignalCard key={i} signal={s} />
             ))}
           </div>
         </>
@@ -201,7 +229,7 @@ export default function RadarPage() {
             return (
               <Wrapper key={i} {...wrapperProps as any}
                 className="flex items-start gap-4 bg-gray-900/60 border border-gray-800 hover:border-blue-500/40 rounded-xl p-4 transition-all group">
-                <Newspaper size={18} className="text-gray-600 shrink-0 mt-0.5 group-hover:text-blue-400 transition-colors"/>
+                <Newspaper size={18} className="text-gray-600 shrink-0 mt-0.5 group-hover:text-blue-400 transition-colors" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-xs font-bold text-gray-300 bg-gray-800 px-2 py-0.5 rounded">{item.symbol}</span>
@@ -211,7 +239,7 @@ export default function RadarPage() {
                   <p className="text-sm text-gray-300 leading-relaxed group-hover:text-white transition-colors">{item.title}</p>
                 </div>
                 {hasLink
-                  ? <ExternalLink size={13} className="text-gray-700 group-hover:text-blue-400 shrink-0 transition-colors"/>
+                  ? <ExternalLink size={13} className="text-gray-700 group-hover:text-blue-400 shrink-0 transition-colors" />
                   : <span className="text-[10px] text-gray-700 shrink-0 mt-1">No link</span>
                 }
               </Wrapper>
