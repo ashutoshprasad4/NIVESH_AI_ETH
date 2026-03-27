@@ -23,6 +23,15 @@ export const Chart: React.FC<ChartProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current || data.length === 0) return;
 
+    const seen = new Set<string | number>();
+    const cleanData = data
+      .filter(d => {
+        if (seen.has(d.time)) return false;
+        seen.add(d.time);
+        return true;
+      })
+      .sort((a, b) => (a.time > b.time ? 1 : a.time < b.time ? -1 : 0));
+
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: backgroundColor },
@@ -48,7 +57,7 @@ export const Chart: React.FC<ChartProps> = ({
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
       });
-      series.setData(data as any);
+      series.setData(cleanData as any);
     } else {
       const series = chart.addSeries(LineSeries, {
         color: '#3b82f6',
@@ -58,7 +67,7 @@ export const Chart: React.FC<ChartProps> = ({
         priceLineVisible: true,
       });
       // Line chart only needs time + value
-      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
+      series.setData(cleanData.map(d => ({ time: d.time, value: d.close })) as any);
     }
 
     chart.timeScale().fitContent();
