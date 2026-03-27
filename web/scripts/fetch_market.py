@@ -58,10 +58,20 @@ def fetch_data(symbols, period="6mo", interval="1d"):
                     continue
 
                 # 🔹 Convert to frontend format
+                # For intraday intervals (e.g. 30m, 1h) we must use Unix timestamps
+                # (integer seconds) so lightweight-charts gets a unique value per bar.
+                # Daily/weekly intervals can use the 'YYYY-MM-DD' string format.
+                is_intraday = any(c in interval for c in ['m', 'h'])
                 records = []
                 for idx, row in ticker_df.iterrows():
+                    if is_intraday:
+                        # Convert to UTC Unix timestamp (seconds) as an integer
+                        ts = int(idx.timestamp())
+                        time_val = ts
+                    else:
+                        time_val = idx.strftime('%Y-%m-%d')
                     records.append({
-                        "time": idx.strftime('%Y-%m-%d'),
+                        "time": time_val,
                         "open": float(row['Open']),
                         "high": float(row['High']),
                         "low": float(row['Low']),
