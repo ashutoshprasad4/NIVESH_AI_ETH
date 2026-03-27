@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Chart } from '@/components/Chart';
 import SignalCard from '@/components/SignalCard';
-import { Search, RefreshCw, Bot, BarChart2, TrendingUp, TrendingDown, Minus, Settings, Send, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, Bot, BarChart2, TrendingUp, TrendingDown, Minus, Send, Trash2 } from 'lucide-react';
 import { searchStocks } from '@/lib/nse-stocks';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; pattern?: string };
@@ -42,7 +42,7 @@ export default function ChartsPage() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const [timeframe, setTimeframe] = useState('6M');
-  const [chartType, setChartType] = useState<'candlestick' | 'line'>('candlestick');
+  const [chartType, setChartType] = useState<'candlestick' | 'line' | 'bar' | 'area'>('candlestick');
   const [chartData, setChartData] = useState<any[]>([]);
   const [patternData, setPatternData] = useState<any>(null);
   const [loadingChart, setLoadingChart] = useState(false);
@@ -52,10 +52,9 @@ export default function ChartsPage() {
   const [chatInput, setChatInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
-  const [userLevel, setUserLevel] = useState('Beginner');
+  const [userLevel, setUserLevel] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Beginner');
   const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
   const [apiProvider, setApiProvider] = useState('gemini-3');
-  const [showKeyInput, setShowKeyInput] = useState(false);
   const [selectedPattern, setSelectedPattern] = useState<any>(null);
 
   // Close suggestions on outside click
@@ -209,7 +208,7 @@ export default function ChartsPage() {
           user_level: userLevel,
           apiKey,
           provider: apiProvider,
-          messages: messages, // conversation history (without current user msg)
+          messages: messages,
           userMessage: userMsg,
         })
       });
@@ -294,15 +293,17 @@ export default function ChartsPage() {
               ))}
             </div>
 
-            {/* Chart Type Toggle */}
-            <div className="flex gap-0.5 bg-gray-900 border border-gray-800 rounded-lg p-0.5">
-              {(['candlestick', 'line'] as const).map(ct => (
-                <button key={ct} onClick={() => setChartType(ct)}
-                  className={`text-xs px-3 py-1.5 rounded-md font-medium capitalize transition-all ${chartType === ct ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}`}>
-                  {ct}
-                </button>
-              ))}
-            </div>
+            {/* Chart Type Dropdown */}
+            <select
+              value={chartType}
+              onChange={e => setChartType(e.target.value as any)}
+              className="text-xs bg-gray-900 border border-gray-800 text-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer hover:border-gray-600 transition-colors"
+            >
+              <option value="candlestick">🕯 Candlestick</option>
+              <option value="line">📈 Line</option>
+              <option value="bar">📊 Bar</option>
+              <option value="area">🌊 Area</option>
+            </select>
 
             <button onClick={() => { loadChart(symbol, timeframe); loadPatterns(symbol); }}
               className="text-gray-400 hover:text-white p-2">
@@ -370,33 +371,8 @@ export default function ChartsPage() {
                   <Trash2 size={14} />
                 </button>
               )}
-              <button onClick={() => setShowKeyInput(v => !v)} className={`transition-colors ${showKeyInput ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
-                <Settings size={16} />
-              </button>
             </div>
           </div>
-          <div className="flex gap-2 mb-2">
-            {['Beginner', 'Advanced'].map(l => (
-              <button key={l} onClick={() => setUserLevel(l)}
-                className={`flex-1 text-xs py-1.5 rounded-lg border font-medium transition-all ${userLevel === l ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-200'}`}>
-                {l}
-              </button>
-            ))}
-          </div>
-          {showKeyInput && (
-            <div className="space-y-2 mt-2">
-              <select value={apiProvider} onChange={e => setApiProvider(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 text-sm text-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <option value="gemini-3">Gemini 3 Flash Preview</option>
-                <option value="gemini-2.0">Gemini 2.0 Flash</option>
-                <option value="gemini-1.5">Gemini 1.5 Flash</option>
-                <option value="openai">OpenAI GPT-3.5</option>
-              </select>
-              <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
-                placeholder="Paste API Key…"
-                className="w-full bg-gray-900 border border-gray-700 text-sm text-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600" />
-            </div>
-          )}
         </div>
 
         {/* Backtest pill */}
@@ -456,8 +432,8 @@ export default function ChartsPage() {
                     </div>
                   )}
                   <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-sm'
-                      : 'bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-bl-sm'
+                    ? 'bg-blue-600 text-white rounded-br-sm'
+                    : 'bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-bl-sm'
                     }`}>
                     {msg.role === 'assistant' ? (
                       <div className="space-y-2">
@@ -499,10 +475,25 @@ export default function ChartsPage() {
         {/* Chat Input */}
         <div className="p-4 border-t border-gray-800 shrink-0">
           <form onSubmit={handleChatSubmit} className="flex items-center gap-2 bg-gray-900 border border-gray-700 focus-within:border-blue-500 rounded-xl px-3 py-2.5 transition-colors">
+            {/* Level picker inside chat box */}
+            <div className="relative flex items-center shrink-0">
+              <select
+                value={userLevel}
+                onChange={e => setUserLevel(e.target.value as any)}
+                className="appearance-none bg-transparent text-[11px] font-semibold text-blue-400 pr-3 pl-0 focus:outline-none cursor-pointer hover:text-blue-300 transition-colors"
+                title="Response style"
+              >
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+              <span className="pointer-events-none absolute right-0 text-blue-400 text-[10px] leading-none">▾</span>
+            </div>
+            <div className="w-px h-4 bg-gray-700 shrink-0" />
             <input
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              placeholder={(apiKey && !apiKey.includes('your_gemini_api_key_here')) ? `Ask about ${symbol.replace('.NS', '')}…` : 'Ask NIVESHAI (Demo Mode)…'}
+              placeholder={(apiKey && !apiKey.includes('your_gemini_api_key_here')) ? `Ask about ${symbol.replace('.NS', '')}…` : 'Ask NIVESHAI …'}
               disabled={isGenerating}
               className="flex-1 bg-transparent text-sm text-gray-200 placeholder-gray-600 focus:outline-none"
             />
@@ -511,7 +502,7 @@ export default function ChartsPage() {
               <Send size={15} />
             </button>
           </form>
-          {(!apiKey || apiKey.includes('your_gemini_api_key_here')) && <p className="text-[11px] text-blue-400/60 text-center mt-3 font-medium tracking-wide">✨ NIVESHAI Demo Mode Active</p>}
+          {(!apiKey || apiKey.includes('your_gemini_api_key_here')) && <p className="text-[11px] text-blue-400/60 text-center mt-3 font-medium tracking-wide">✨ NIVESHAI Help Bot</p>}
         </div>
       </div>
     </div>

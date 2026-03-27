@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries } from 'lightweight-charts';
 
 interface ChartProps {
   data: { time: string; open?: number; high?: number; low?: number; close: number }[];
-  chartType?: 'candlestick' | 'line';
+  chartType?: 'candlestick' | 'line' | 'bar' | 'area';
   colors?: {
     backgroundColor?: string;
     textColor?: string;
@@ -49,6 +49,23 @@ export const Chart: React.FC<ChartProps> = ({
         wickDownColor: '#ef5350',
       });
       series.setData(data as any);
+    } else if (chartType === 'area') {
+      const series = chart.addSeries(AreaSeries, {
+        lineColor: '#3b82f6',
+        topColor: 'rgba(59,130,246,0.4)',
+        bottomColor: 'rgba(59,130,246,0.02)',
+        lineWidth: 2,
+        crosshairMarkerVisible: true,
+        lastValueVisible: true,
+        priceLineVisible: true,
+      });
+      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
+    } else if (chartType === 'bar') {
+      const series = chart.addSeries(HistogramSeries, {
+        color: '#6366f1',
+        priceFormat: { type: 'price' },
+      });
+      series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
     } else {
       const series = chart.addSeries(LineSeries, {
         color: '#3b82f6',
@@ -57,7 +74,6 @@ export const Chart: React.FC<ChartProps> = ({
         lastValueVisible: true,
         priceLineVisible: true,
       });
-      // Line chart only needs time + value
       series.setData(data.map(d => ({ time: d.time, value: d.close })) as any);
     }
 
