@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runPythonScript, getCachedData, setCachedData } from '@/lib/api-utils';
+import { runPythonScript, getCachedData, setCachedData } from '../../../lib/api-utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

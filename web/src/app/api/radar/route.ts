@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runPythonScript, getCachedData, setCachedData } from '@/lib/api-utils';
+import { runPythonScript, getCachedData, setCachedData } from '../../../lib/api-utils';
 
 export async function GET() {
   const cacheKey = 'radar_data';
