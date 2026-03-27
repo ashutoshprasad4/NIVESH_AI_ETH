@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { runPythonScript, getCachedData, setCachedData } from '../../../lib/api-utils';
 
 export async function GET() {
-  const cacheKey = 'radar_data';
+  const cacheKey = 'radar_data_v3';
   const cached = getCachedData(cacheKey);
   if (cached) return NextResponse.json(cached);
 
