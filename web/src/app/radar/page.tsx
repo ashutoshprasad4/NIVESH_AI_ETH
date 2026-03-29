@@ -391,7 +391,7 @@ export default function RadarPage() {
             {filtered.length === 0 ? (
               <div className="text-gray-500 text-sm p-8 bg-gray-900 border border-gray-800 rounded-xl text-center">No signals matched the selected filter.</div>
             ) : filtered.map((s, i) => (
-              <ExpandableSignalCard key={i} signal={s} apiKey={apiKey} apiProvider={apiProvider} />
+              <ExpandableSignalCard key={`${s.symbol}-${s.type}-${i}`} signal={s} apiKey={apiKey} apiProvider={apiProvider} />
             ))}
           </div>
         </>
